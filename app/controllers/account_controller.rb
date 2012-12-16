@@ -169,17 +169,48 @@ class AccountController < ApplicationController
   end
 
   def open_id_authenticate(openid_url)
-    authenticate_with_open_id(openid_url, :required => [:nickname, :fullname, :email], :return_to => signin_url, :method => :post) do |result, identity_url, registration|
+    authenticate_with_open_id(openid_url, :required => [:nickname, :fullname, :email, #Original
+							"http://axschema.org/namePerson/first", #Google
+                                                        "http://axschema.org/namePerson/last", #Google
+                                                        "http://schema.openid.net/contact/email", #Google
+                                                        "http://axschema.org/namePerson", #Yahoo
+                                                        "http://axschema.org/contact/email"], #Yahoo
+                                          :return_to => signin_url, :method => :post) do |result, identity_url, registration|
       if result.successful?
         user = User.find_or_initialize_by_identity_url(identity_url)
         if user.new_record?
           # Self-registration off
           redirect_to(home_url) && return unless Setting.self_registration?
 
-          # Create on the fly
-          user.login = registration['nickname'] unless registration['nickname'].nil?
-          user.mail = registration['email'] unless registration['email'].nil?
-          user.firstname, user.lastname = registration['fullname'].split(' ') unless registration['fullname'].nil?
+          # The open_id_authentication plugin returns registration as an OpenID::SReg::Response
+          # The problem here is that most OpenID providres don't handle SReg anymore (e.g. Google)
+          # So, we need to get an OpenID::AX::FetchResponse
+          axreg = OpenID::AX::FetchResponse.from_success_response(request.env[Rack::OpenID::RESPONSE])
+
+          # The previous call to get the FetchResponse object will be nil of nothing was returned from the provider
+          # At the very least, it's one way to know we should fall back to SReg or use AX
+          if axreg.nil?
+            # Create on the fly
+            user.login = registration['nickname'] unless registration['nickname'].nil?
+            user.mail = registration['email'] unless registration['email'].nil?
+            user.firstname, user.lastname = registration['fullname'].split(' ') unless registration['fullname'].nil?
+          else # Use AX (Attribute Exchange)
+            if axreg.get_single("http://schema.openid.net/contact/email").nil?
+              user.mail = axreg.get_single("http://axschema.org/contact/email") unless axreg.get_single("http://axschema.org/contact/email").nil?
+            else
+              user.mail = axreg.get_single("http://schema.openid.net/contact/email")
+            end
+
+            user.login = user.mail.split("@")[0] unless user.mail.nil?
+
+            if axreg.get_single("http://axschema.org/namePerson").nil?
+              user.firstname = axreg.get_single("http://axschema.org/namePerson/first") unless axreg.get_single("http://axschema.org/namePerson/first").nil?
+              user.lastname =  axreg.get_single("http://axschema.org/namePerson/last") unless axreg.get_single("http://axschema.org/namePerson/last").nil? 
+            else
+              user.firstname, user.lastname = axreg.get_single("http://axschema.org/namePerson").split(' ')
+            end
+          end
+
           user.random_password
           user.register
 
