@@ -175,7 +175,7 @@ class AccountController < ApplicationController
                                                         "http://schema.openid.net/contact/email", #Google
                                                         "http://axschema.org/namePerson", #Yahoo
                                                         "http://axschema.org/contact/email"], #Yahoo
-                                          :return_to => signin_url, :method => :post) do |result, identity_url, registration|
+                                          :return_to => signin_url(:autologin => params[:autologin]), :method => :post) do |result, identity_url, registration|
       if result.successful?
         user = User.find_or_initialize_by_identity_url(identity_url)
         if user.new_record?
