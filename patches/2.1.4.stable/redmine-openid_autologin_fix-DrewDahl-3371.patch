@@ -1,0 +1,25 @@
+From e28b194d1821b8d7260b198ea90a8db10a084fcb Mon Sep 17 00:00:00 2001
+From: Andrew Dahl <Andrew@DrewDahl.com>
+Date: Sun, 16 Dec 2012 15:56:20 -0600
+Subject: [PATCH] Fixes Auto Login when using OpenId - Defect #3371
+
+---
+ app/controllers/account_controller.rb |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/app/controllers/account_controller.rb b/app/controllers/account_controller.rb
+index 70ab851..65907e0 100644
+--- a/app/controllers/account_controller.rb
++++ b/app/controllers/account_controller.rb
+@@ -169,7 +169,7 @@ class AccountController < ApplicationController
+   end
+ 
+   def open_id_authenticate(openid_url)
+-    authenticate_with_open_id(openid_url, :required => [:nickname, :fullname, :email], :return_to => signin_url, :method => :post) do |result, identity_url, registration|
++    authenticate_with_open_id(openid_url, :required => [:nickname, :fullname, :email], :return_to => signin_url(:autologin => params[:autologin]), :method => :post) do |result, identity_url, registration|
+       if result.successful?
+         user = User.find_or_initialize_by_identity_url(identity_url)
+         if user.new_record?
+-- 
+1.7.1
+

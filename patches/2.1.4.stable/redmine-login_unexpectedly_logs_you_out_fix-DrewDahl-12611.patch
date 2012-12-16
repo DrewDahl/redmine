@@ -1,0 +1,34 @@
+From c8af4ad18d32d3af49adb9d14e6ebc5f074ba3ea Mon Sep 17 00:00:00 2001
+From: Andrew Dahl <Andrew@DrewDahl.com>
+Date: Sun, 16 Dec 2012 16:38:07 -0600
+Subject: [PATCH] Removed unintuitive logout from login method and added a redirect
+ if is user already logged in.
+
+The reason for this is that if you accidently go to the login page
+and are logged in, you expect to be redirected as though you just
+logged in, not logged off and required login again.
+
+If the user is logged in already, it redirects to the home page.
+If not, it displays the login page as intended.
+---
+ app/controllers/account_controller.rb |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/app/controllers/account_controller.rb b/app/controllers/account_controller.rb
+index 65907e0..6fd4433 100644
+--- a/app/controllers/account_controller.rb
++++ b/app/controllers/account_controller.rb
+@@ -25,7 +25,9 @@ class AccountController < ApplicationController
+   # Login request and validation
+   def login
+     if request.get?
+-      logout_user
++      if User.current.logged?
++        redirect_to home_url
++      end
+     else
+       authenticate_user
+     end
+-- 
+1.7.1
+

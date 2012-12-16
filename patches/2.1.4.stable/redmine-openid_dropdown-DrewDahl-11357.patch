@@ -1,0 +1,165 @@
+From b4c40d09ae8227d0bea0fd7806dbae43d150d258 Mon Sep 17 00:00:00 2001
+From: Andrew Dahl <Andrew@DrewDahl.com>
+Date: Sun, 16 Dec 2012 04:41:26 -0600
+Subject: [PATCH 1/2] Added drop-down menu for open-id url selection to login page
+
+---
+ app/models/open_id_provider.rb     |   22 ++++++++++++++++++++++
+ app/views/account/login.html.erb   |    8 +++++++-
+ public/stylesheets/application.css |    3 ++-
+ 3 files changed, 31 insertions(+), 2 deletions(-)
+ create mode 100644 app/models/open_id_provider.rb
+
+diff --git a/app/models/open_id_provider.rb b/app/models/open_id_provider.rb
+new file mode 100644
+index 0000000..82e5b68
+--- /dev/null
++++ b/app/models/open_id_provider.rb
+@@ -0,0 +1,22 @@
++# Redmine - project management software
++# Copyright (C) 2006-2012  Jean-Philippe Lang
++#
++# This program is free software; you can redistribute it and/or
++# modify it under the terms of the GNU General Public License
++# as published by the Free Software Foundation; either version 2
++# of the License, or (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++
++class OpenIdProvider < ActiveRecord::Base
++  self.table_name = "#{table_name_prefix}open_id_providers#{table_name_suffix}"
++
++  validates_presence_of :name, :url
++end
+diff --git a/app/views/account/login.html.erb b/app/views/account/login.html.erb
+index 6c76ab2..a4ac471 100644
+--- a/app/views/account/login.html.erb
++++ b/app/views/account/login.html.erb
+@@ -14,7 +14,10 @@
+ <% if Setting.openid? %>
+ <tr>
+   <td align="right"><label for="openid_url"><%=l(:field_identity_url)%></label></td>
+-  <td align="left"><%= text_field_tag "openid_url", nil, :tabindex => '3' %></td>
++  <td align="left">
++    <%= text_field_tag 'openid_url', nil, :tabindex => '3' %>
++    <%= select_tag :openid_url_select, options_for_select(OpenIdProvider.all.collect {|p| [p.name, p.url]}), { :tabindex => '4', :prompt => l(:field_identity_url) } %>
++  </td>
+ </tr>
+ <% end %>
+ <tr>
+@@ -37,6 +40,9 @@
+ </tr>
+ </table>
+ <%= javascript_tag "$('#username').focus();" %>
++<% if Setting.openid? %>
++<%= javascript_tag "$('#openid_url_select').change(function() { $('#openid_url').val ($('#openid_url_select').val());});" %>
++<% end %>
+ <% end %>
+ </div>
+ <%= call_hook :view_account_login_bottom %>
+diff --git a/public/stylesheets/application.css b/public/stylesheets/application.css
+index fe6d7b4..6c1b1f2 100644
+--- a/public/stylesheets/application.css
++++ b/public/stylesheets/application.css
+@@ -96,7 +96,8 @@ div.modal { border-radius:5px; background:#fff; z-index:50; padding:4px;}
+ div.modal h3.title {display:none;}
+ div.modal p.buttons {text-align:right; margin-bottom:0;}
+ 
+-input#openid_url { background: url(../images/openid-bg.gif) no-repeat; background-color: #fff; background-position: 0 50%; padding-left: 18px; }
++input#openid_url { background: url(../images/openid-bg.gif) no-repeat; background-color: #fff; background-position: 0 50%; padding-left: 18px; width: 177px;}
++select#openid_url_select { width: 100px; }
+ 
+ .clear:after{ content: "."; display: block; height: 0; clear: both; visibility: hidden; }
+ 
+-- 
+1.7.1
+
+
+From e28d6ea99c9f5d015918b7d8d7a7c41a5ce29f37 Mon Sep 17 00:00:00 2001
+From: Andrew Dahl <Andrew@DrewDahl.com>
+Date: Sun, 16 Dec 2012 05:21:48 -0600
+Subject: [PATCH 2/2] Created migrations for adding open_id_providers table and inserting data
+
+---
+ .../20121216105941_add_open_id_providers_table.rb  |   13 ++++++
+ .../20121216110401_insert_open_id_providers.rb     |   41 ++++++++++++++++++++
+ 2 files changed, 54 insertions(+), 0 deletions(-)
+ create mode 100644 db/migrate/20121216105941_add_open_id_providers_table.rb
+ create mode 100644 db/migrate/20121216110401_insert_open_id_providers.rb
+
+diff --git a/db/migrate/20121216105941_add_open_id_providers_table.rb b/db/migrate/20121216105941_add_open_id_providers_table.rb
+new file mode 100644
+index 0000000..e9b06e9
+--- /dev/null
++++ b/db/migrate/20121216105941_add_open_id_providers_table.rb
+@@ -0,0 +1,13 @@
++class AddOpenIdProvidersTable < ActiveRecord::Migration
++  def self.up
++  create_table :open_id_providers, :force => true do |t|
++    t.string :url,                :null => false
++    t.string :name, :limit => 30, :null => false
++  end
++
++  end
++
++  def self.down
++    drop_table :open_id_providers
++  end
++end
+diff --git a/db/migrate/20121216110401_insert_open_id_providers.rb b/db/migrate/20121216110401_insert_open_id_providers.rb
+new file mode 100644
+index 0000000..1b501f6
+--- /dev/null
++++ b/db/migrate/20121216110401_insert_open_id_providers.rb
+@@ -0,0 +1,41 @@
++class InsertOpenIdProviders < ActiveRecord::Migration
++  def self.up
++    OpenIdProvider.reset_column_information
++    google = OpenIdProvider.new(:name => 'Google', :url => 'https://www.google.com/accounts/o8/id')
++    google.save
++
++    yahoo = OpenIdProvider.new(:name => 'Yahoo', :url => 'http://me.yahoo.com/')
++    yahoo.save
++
++    aol = OpenIdProvider.new(:name => 'AOL', :url => 'http://openid.aol.com/{username}')
++    aol.save
++
++    myopenid = OpenIdProvider.new(:name => 'MyOpenID', :url => 'http://{username}.myopenid.com/')
++    myopenid.save
++
++    livejournal = OpenIdProvider.new(:name => 'LiveJournal', :url => 'http://{username}.livejournal.com/')
++    livejournal.save
++
++    wordpress = OpenIdProvider.new(:name => 'Wordpress', :url => 'http://{username}.wordpress.com/')
++    wordpress.save
++
++    blogger = OpenIdProvider.new(:name => 'Blogger', :url => 'http://{username}.blogspot.com/')
++    blogger.save
++
++    verisign = OpenIdProvider.new(:name => 'Verisign', :url => 'http://{username}.pip.verisignlabs.com/')
++    verisign.save
++
++    claimid = OpenIdProvider.new(:name => 'ClaimID', :url => 'http://claimid.com/{username}')
++    claimid.save
++
++    clickpass = OpenIdProvider.new(:name => 'ClickPass', :url => 'http://clickpass.com/public/{username}')
++    clickpass.save
++
++    googleprofile = OpenIdProvider.new(:name => 'Google Profile', :url => 'http://www.google.com/profiles/{username}')
++    googleprofile.save
++  end
++
++  def self.down
++    OpenIdProvider.destroy_all 
++  end
++end
+-- 
+1.7.1
+
